@@ -33,3 +33,6 @@ dist-demo
 # Supabase CLI e configurações locais do Claude Code (podem conter chaves)
 supabase/.temp/
 .claude/settings.local.json
+
+# Gerado pelo deno check local
+deno.lock
