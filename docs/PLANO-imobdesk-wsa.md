@@ -47,7 +47,7 @@ Status: mockup v2 aprovado, foto B (suporte) escolhida e P1 a P3 respondidos em 
 - [x] Nada criado no `public`; `anon` sem `USAGE`; schema acrescentado a `pgrst.db_schemas` sem tirar os outros.
 - [x] Ensaio num Postgres 17 de verdade (`npm run test:db`): aplica do zero, sem erro.
 - [x] Pacote do SQL Editor: `supabase/sql-editor/1_estrutura_parte1..4.sql` (`node scripts/montar-sql-editor.mjs`).
-- [ ] Aplicado no ikvj (você roda as partes no SQL Editor).
+- [x] Aplicado no ikvj pelo SQL Editor (23/10/2026, partes 1 a 4 e 2_primeiro_admin).
 
 ### Fase 2 — Multiempresa
 - [x] `empresas`, `admins_wsa`, `usuario_preferencias`, `empresa_atual()`, `minhas_empresas()`, `trocar_empresa()`, `criar_empresa()`, `listar_empresas_wsa()`, `salvar_tema()` e `minhas_preferencias()`.
