@@ -79,8 +79,8 @@ Status: mockup v2 aprovado, foto B (suporte) escolhida e P1 a P3 respondidos em 
 - [ ] Página inicial, Tickets (lista/kanban) e Ticket conforme o mockup. As outras telas herdam os tokens.
 
 ### Fase 6 — Login
-- [ ] `Login.tsx`/`AuthShell.tsx` no `.mpl-*` com a foto B em `public/`.
-- [ ] Mantidos: lembrar e-mail, Caps Lock, mostrar senha e "Esqueceu a senha?".
+- [x] `Login.tsx`/`AuthShell.tsx` no `.mpl-*` com a foto B (`public/login-helpdesk.jpg`); vale também para Redefinir e Trocar senha.
+- [x] Mantidos: lembrar e-mail, Caps Lock, mostrar senha e "Esqueceu a senha?".
 - [ ] URL de produção em ikvj › Authentication › Redirect URLs (pendência sua).
 
 ### Fase 7 — Verificação e registro

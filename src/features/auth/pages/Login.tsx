@@ -57,7 +57,7 @@ export function Login() {
   }
 
   return (
-    <AuthShell>
+    <AuthShell kicker="Acesso do colaborador">
       <div className="card auth-card">
         {mode === "login" ? <LoginForm onForgot={() => setMode("reset")} /> : <ResetForm onBack={() => setMode("login")} />}
       </div>
@@ -174,25 +174,28 @@ function LoginForm({ onForgot }: { onForgot: () => void }) {
           )}
         </div>
 
-        <label className="auth-remember">
-          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-          Lembrar meu e-mail neste computador
-        </label>
+        <div className="mpl-links">
+          <label className="auth-remember">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            Lembrar meu e-mail
+          </label>
+          <button type="button" className="auth-card__link" onClick={onForgot}>
+            Esqueceu a senha?
+          </button>
+        </div>
 
         <button type="submit" className="btn btn--primary btn--lg auth-card__submit" disabled={isSubmitting} aria-busy={isSubmitting}>
           {isSubmitting ? (
             <>
-              <span className="auth-spinner" aria-hidden="true" /> Entrando…
+              Entrando… <span className="auth-spinner" aria-hidden="true" />
             </>
           ) : (
-            "Entrar"
+            <>
+              Entrar <span className="mpl-seta" aria-hidden="true">→</span>
+            </>
           )}
         </button>
       </form>
-
-      <button type="button" className="auth-card__link" onClick={onForgot}>
-        Esqueceu a senha?
-      </button>
     </>
   );
 }
