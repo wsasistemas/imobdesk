@@ -27,6 +27,7 @@ const PermissoesAplicativo = lazy(() =>
 );
 const Auditoria = lazy(() => import("./features/configuracoes/pages/Auditoria").then((m) => ({ default: m.Auditoria })));
 const Sessoes = lazy(() => import("./features/configuracoes/pages/Sessoes").then((m) => ({ default: m.Sessoes })));
+const Empresas = lazy(() => import("./features/empresas/Empresas").then((m) => ({ default: m.Empresas })));
 // Telas de autenticação também sob demanda.
 const Login = lazy(() => import("./features/auth/pages/Login").then((m) => ({ default: m.Login })));
 const RedefinirSenha = lazy(() =>
@@ -59,6 +60,7 @@ const pages: Record<TopLevelMenuId, ReactElement> = {
   configure_integrations: <Integracoes />,
   view_audit_logs: <Auditoria />,
   manage_sessions: <Sessoes />,
+  manage_empresas: <Empresas />,
   centro_treinamento: <CentroTreinamento />,
 };
 

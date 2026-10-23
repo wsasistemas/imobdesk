@@ -66,6 +66,14 @@ export const supabasePermissionsService: PermissionsService = {
       const liberado = !souCentral.error && (souCentral.data as unknown) === true;
       for (const item of menuRegistry) if (item.centralOnly) permissions[item.id] = liberado;
     }
+    // Menus do Super admin da WSA (Empresas): não basta ser Super admin da empresa aberta.
+    if (menuRegistry.some((item) => item.wsaOnly)) {
+      // RPC nova, fora dos tipos gerados: chamada sem tipo.
+      const rpcSemTipo = supabase.rpc as unknown as (nome: string) => PromiseLike<{ data: { adminWsa?: boolean } | null; error: unknown }>;
+      const pref = await rpcSemTipo("minhas_preferencias");
+      const adminWsa = !pref.error && pref.data?.adminWsa === true;
+      for (const item of menuRegistry) if (item.wsaOnly) permissions[item.id] = adminWsa;
+    }
 
     return {
       user,

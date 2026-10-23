@@ -73,16 +73,17 @@ Status: mockup v2 aprovado, foto B (suporte) escolhida e P1 a P3 respondidos em 
 ### Fase 4 — Front ligado ao ikvj
 - [x] `.env.local` com a URL e a chave publishable do ikvj e `VITE_APP_SCHEMA=imobdesk`.
 - [x] Marca Imobdesk / WSA Sistemas, sem domínio fixo, Movidesk fora, "App do solicitante".
-- [ ] Empresa atual no topo, seletor de empresa (P3) e tela Configurações › Empresas (P2).
-- [ ] Tipos do banco gerados de novo (`--schema imobdesk,public`).
+- [x] Empresa aberta no topo; vira seletor com mais de uma empresa e recarrega o portal (P3). Código em `src/features/empresas/`.
+- [x] Configurações › Empresas (flag `wsaOnly` no `menuRegistry`): lista e cria empresa, só para o Super admin da WSA (P2).
+- [ ] Tipos do banco gerados de novo (`--schema imobdesk,public`). Precisa do login da conta WSA no CLI; até lá, as RPCs novas são chamadas sem tipo.
 
 ### Fase 5 — Visual Apple HIG
-- [ ] Tokens WSA em `src/index.css`, com o tema escuro em `[data-tema="escuro"]`.
-- [ ] Preferência claro/escuro/automático salva no usuário (`salvar_tema`), aplicada antes da primeira pintura.
-- [ ] Lateral clara do Mac: ícones em quadradinhos coloridos e item ativo em degradê.
-- [ ] Botões em cápsula, alvos de 44 px, controle segmentado e listas agrupadas.
-- [ ] Topo com busca, empresa, aparência e notificações.
-- [ ] Página inicial, Tickets (lista/kanban) e Ticket conforme o mockup. As outras telas herdam os tokens.
+- [x] Tokens WSA em `src/index.css` (os do portal e os `--ds-*`), com o tema escuro em `[data-tema="escuro"]`.
+- [x] Aparência claro/escuro/automático no topo, salva no login (`salvar_tema`) e aplicada antes da primeira pintura (`public/tema.js`).
+- [x] Lateral clara do Mac (ícones coloridos que já existiam) e item ativo em degradê azul → abóbora.
+- [x] Botões em cápsula com retorno ao toque, campos com anel de foco de 4 px, cards com raio de 14 px.
+- [x] Topo com empresa, aparência e notificações. A busca geral do mockup não existe no sistema: fica para uma fase própria.
+- [x] Página inicial, Tickets e as demais telas herdam os tokens. Conferido no navegador, claro e escuro: Início, Tickets (kanban), Empresas e Permissões por aplicativo.
 
 ### Fase 6 — Login
 - [x] `Login.tsx`/`AuthShell.tsx` no `.mpl-*` com a foto B (`public/login-helpdesk.jpg`); vale também para Redefinir e Trocar senha.

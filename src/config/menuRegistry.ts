@@ -65,6 +65,8 @@ interface MenuItemDefinition {
   adminOnly?: boolean;
   /** Só o Super admin da Central de acessos da WSA (super_admin da Central). */
   centralOnly?: boolean;
+  /** Só o Super admin da WSA (imobdesk.admins_wsa), que cria e vê todas as empresas. */
+  wsaOnly?: boolean;
   /** Sempre visível, sem depender de permissão. */
   alwaysVisible?: boolean;
   /** Seção dentro da tela de outro item (id do pai). */
@@ -377,6 +379,16 @@ const definitions = [
     description: "Quem pode entrar em cada aplicativo da WSA (um por schema do Supabase).",
     superAdminOnly: true,
     centralOnly: true,
+  },
+  {
+    id: "manage_empresas",
+    label: "Empresas",
+    path: "/configuracoes/empresas",
+    icon: Building2,
+    group: "configuracoes",
+    description: "Empresas clientes do Imobdesk: cada uma com os seus usuários, setores, tickets e configurações.",
+    superAdminOnly: true,
+    wsaOnly: true,
   },
   {
     id: "configure_integrations",

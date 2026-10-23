@@ -5,6 +5,8 @@ import { DevUserSwitcher } from "../features/configuracoes/access/DevUserSwitche
 import { useAccess } from "../features/configuracoes/access/useAccess";
 import { DATA_SOURCE } from "../features/configuracoes/services";
 import { useSignOut } from "../features/auth/useSignOut";
+import { MenuAparencia } from "../features/empresas/MenuAparencia";
+import { SeletorEmpresa } from "../features/empresas/SeletorEmpresa";
 import "./Topbar.css";
 
 interface TopbarProps {
@@ -42,6 +44,8 @@ export function Topbar({ onToggleSidebar }: TopbarProps) {
         {/* Só com dados em memória: com o Supabase não há como entrar na conta de outra pessoa. */}
         {(import.meta.env.DEV || import.meta.env.MODE === "demo") && DATA_SOURCE === "mock" && <DevUserSwitcher />}
 
+        <SeletorEmpresa ativo={Boolean(user)} />
+
         <span className="topbar__status" title={connected ? "Dados no Supabase" : "Dados simulados em memória"}>
           {connected ? <Cloud size={14} aria-hidden="true" /> : <HardDrive size={14} aria-hidden="true" />}
           <span className="topbar__hide-sm">{connected ? "Sincronizado" : "Modo simulado"}</span>
@@ -66,6 +70,8 @@ export function Topbar({ onToggleSidebar }: TopbarProps) {
             <LogOut size={14} />
           </button>
         </div>
+
+        <MenuAparencia ativo={Boolean(user)} />
 
         <SinoAvisos ativo={Boolean(user)} />
       </div>
