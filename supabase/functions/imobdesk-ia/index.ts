@@ -12,6 +12,7 @@
 // Secrets: GEMINI_API_KEY (chave da WSA), APP_PORTAL_ATENDIMENTO_IA_MODELO e _RESERVA (opcionais).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { clienteServico, paraCadaEmpresa } from "../_shared/empresa.ts";
 import { corsHeaders, errorResponse, json, PortalError, portalContext, type AdminClient } from "../_shared/portal.ts";
 import { classificarComGemini } from "../_shared/ia/gemini.ts";
 import {
@@ -52,10 +53,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ code: "INVALID_INPUT", message: "Método não suportado." }, 405);
   try {
-    const url = Deno.env.get("SUPABASE_URL");
-    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!url || !key) throw new PortalError("INTERNAL", "Função sem configuração do Supabase.", 500);
-    let db: AdminClient = createClient(url, key, { db: { schema: "imobdesk" }, auth: { persistSession: false, autoRefreshToken: false } });
+    const url = Deno.env.get("SUPABASE_URL") ?? "";
     const corpo = (await req.clone().json().catch(() => ({}))) as { acao?: string; ticketId?: number };
 
     // ---------- resumir: quem vê o ticket (o banco confere pela RPC chamada com o token da pessoa) ----------
@@ -85,80 +83,86 @@ Deno.serve(async (req) => {
       return json({ ...resumo, modelo: r.modelo });
     }
 
-    const chave = await db.rpc("at_ia_cron_chave");
-    if (!iguais(req.headers.get("x-atendimento-chave") ?? "", (chave.data as string | null) ?? "")) {
-      const { caller, admin } = await portalContext(req);
-      const [perfil, sup] = await Promise.all([
-        admin.rpc("perfil_de", { p_usuario: caller.id }),
-        admin.rpc("tem_permissao_de", { p_usuario: caller.id, p_permissao: "gestao_atendimento_supervisao" }),
-      ]);
-      if (!(perfil.data === "super_admin" || sup.data === true)) throw new PortalError("FORBIDDEN", "Só a supervisão geral roda a triagem.", 403);
-      db = admin;
-    }
-
     const chaveIa = Deno.env.get("GEMINI_API_KEY") ?? "";
     if (!chaveIa) throw new PortalError("INTEGRATION_NOT_CONFIGURED", "Falta o secret GEMINI_API_KEY nas Edge Functions.");
-    const modelo = Deno.env.get("APP_PORTAL_ATENDIMENTO_IA_MODELO") || "gemini-3.6-flash";
-    const reserva = Deno.env.get("APP_PORTAL_ATENDIMENTO_IA_RESERVA") || "gemini-flash-latest";
 
-    const { data, error } = await db.rpc("ch_ia_pendentes", { p_limite: 10 });
-    if (error) throw new Error(error.message);
-    const resultados: Record<string, unknown>[] = [];
-    for (const t of (data ?? []) as Pendente[]) {
-      const inicio = Date.now();
-      let registro: Record<string, unknown>;
-      try {
-        if (t.equipes.length === 0) throw new Error("O setor não tem equipes ativas.");
-        const r = await classificarComGemini(fetch, {
-          chave: chaveIa,
-          modelo,
-          reserva,
-          sistema: REGRAS_FIXAS,
-          pedido: montarPedido(prepararTicket(t.assunto, t.descricao), t.equipes, t.servicos),
-          esquema: ESQUEMA_CLASSIFICACAO,
-        });
-        const c = validarClassificacao(r.json, t.equipes, t.servicos);
-        registro = c
-          ? { ...c, modelo: r.modelo, tokensEntrada: r.tokensEntrada, tokensSaida: r.tokensSaida, ms: Date.now() - inicio }
-          : { erro: "Resposta da IA fora das equipes do setor.", modelo: r.modelo, ms: Date.now() - inicio };
-      } catch (e) {
-        registro = { erro: String(e instanceof Error ? e.message : e).slice(0, 500), modelo, ms: Date.now() - inicio };
-      }
-      const g = await db.rpc("ch_ia_registrar", { p_ticket: t.ticketId, p: registro });
-      resultados.push({ ticket: t.ticketId, ...(g.error ? { erro: g.error.message } : (g.data as Record<string, unknown>)) });
+    // pg_cron (chave do Vault): todas as empresas; supervisão geral logada ("rodar agora"): só a empresa dela.
+    const chave = await clienteServico().rpc("at_ia_cron_chave");
+    if (iguais(req.headers.get("x-atendimento-chave") ?? "", (chave.data as string | null) ?? "")) {
+      return json(await paraCadaEmpresa((db) => triagem(db, chaveIa)));
     }
-    console.log(JSON.stringify({ evento: "ia.triagem", resultados }));
-
-    // Empreendimento (Administração › Empreendimentos): mesmos cuidados; aplica sozinho a partir do limiar do setor.
-    const pend = await db.rpc("ch_ia_empreendimentos_pendentes", { p_limite: 10 });
-    if (pend.error) throw new Error(pend.error.message);
-    const empreendimentos: Record<string, unknown>[] = [];
-    for (const t of (pend.data ?? []) as PendenteEmpreendimento[]) {
-      const inicio = Date.now();
-      let registro: Record<string, unknown>;
-      try {
-        if (t.empreendimentos.length === 0) throw new Error("Nenhum empreendimento ativo no cadastro.");
-        const r = await classificarComGemini(fetch, {
-          chave: chaveIa,
-          modelo,
-          reserva,
-          sistema: REGRAS_EMPREENDIMENTO,
-          pedido: montarPedidoEmpreendimento(prepararTicket(t.assunto, t.descricao), t.empreendimentos),
-          esquema: ESQUEMA_EMPREENDIMENTO,
-        });
-        const c = validarIdentificacao(r.json, t.empreendimentos);
-        registro = c
-          ? { ...c, modelo: r.modelo, tokensEntrada: r.tokensEntrada, tokensSaida: r.tokensSaida, ms: Date.now() - inicio }
-          : { erro: "Resposta da IA fora do formato.", modelo: r.modelo, ms: Date.now() - inicio };
-      } catch (e) {
-        registro = { erro: String(e instanceof Error ? e.message : e).slice(0, 500), modelo, ms: Date.now() - inicio };
-      }
-      const g = await db.rpc("ch_ia_empreendimento_registrar", { p_ticket: t.ticketId, p: registro });
-      empreendimentos.push({ ticket: t.ticketId, ...(g.error ? { erro: g.error.message } : (g.data as Record<string, unknown>)) });
-    }
-    if (empreendimentos.length) console.log(JSON.stringify({ evento: "ia.empreendimento", resultados: empreendimentos }));
-    return json({ resultados, empreendimentos });
+    const { caller, admin } = await portalContext(req);
+    const [perfil, sup] = await Promise.all([
+      admin.rpc("perfil_de", { p_usuario: caller.id }),
+      admin.rpc("tem_permissao_de", { p_usuario: caller.id, p_permissao: "gestao_atendimento_supervisao" }),
+    ]);
+    if (!(perfil.data === "super_admin" || sup.data === true)) throw new PortalError("FORBIDDEN", "Só a supervisão geral roda a triagem.", 403);
+    return json(await triagem(admin, chaveIa));
   } catch (error) {
     return errorResponse(error);
   }
 });
+
+/** Triagem por equipe e identificação do empreendimento nos tickets pendentes de uma empresa (db preso a ela). */
+async function triagem(db: AdminClient, chaveIa: string) {
+  const modelo = Deno.env.get("APP_PORTAL_ATENDIMENTO_IA_MODELO") || "gemini-3.6-flash";
+  const reserva = Deno.env.get("APP_PORTAL_ATENDIMENTO_IA_RESERVA") || "gemini-flash-latest";
+
+  const { data, error } = await db.rpc("ch_ia_pendentes", { p_limite: 10 });
+  if (error) throw new Error(error.message);
+  const resultados: Record<string, unknown>[] = [];
+  for (const t of (data ?? []) as Pendente[]) {
+    const inicio = Date.now();
+    let registro: Record<string, unknown>;
+    try {
+      if (t.equipes.length === 0) throw new Error("O setor não tem equipes ativas.");
+      const r = await classificarComGemini(fetch, {
+        chave: chaveIa,
+        modelo,
+        reserva,
+        sistema: REGRAS_FIXAS,
+        pedido: montarPedido(prepararTicket(t.assunto, t.descricao), t.equipes, t.servicos),
+        esquema: ESQUEMA_CLASSIFICACAO,
+      });
+      const c = validarClassificacao(r.json, t.equipes, t.servicos);
+      registro = c
+        ? { ...c, modelo: r.modelo, tokensEntrada: r.tokensEntrada, tokensSaida: r.tokensSaida, ms: Date.now() - inicio }
+        : { erro: "Resposta da IA fora das equipes do setor.", modelo: r.modelo, ms: Date.now() - inicio };
+    } catch (e) {
+      registro = { erro: String(e instanceof Error ? e.message : e).slice(0, 500), modelo, ms: Date.now() - inicio };
+    }
+    const g = await db.rpc("ch_ia_registrar", { p_ticket: t.ticketId, p: registro });
+    resultados.push({ ticket: t.ticketId, ...(g.error ? { erro: g.error.message } : (g.data as Record<string, unknown>)) });
+  }
+  console.log(JSON.stringify({ evento: "ia.triagem", resultados }));
+
+  // Empreendimento (Administração › Empreendimentos): mesmos cuidados; aplica sozinho a partir do limiar do setor.
+  const pend = await db.rpc("ch_ia_empreendimentos_pendentes", { p_limite: 10 });
+  if (pend.error) throw new Error(pend.error.message);
+  const empreendimentos: Record<string, unknown>[] = [];
+  for (const t of (pend.data ?? []) as PendenteEmpreendimento[]) {
+    const inicio = Date.now();
+    let registro: Record<string, unknown>;
+    try {
+      if (t.empreendimentos.length === 0) throw new Error("Nenhum empreendimento ativo no cadastro.");
+      const r = await classificarComGemini(fetch, {
+        chave: chaveIa,
+        modelo,
+        reserva,
+        sistema: REGRAS_EMPREENDIMENTO,
+        pedido: montarPedidoEmpreendimento(prepararTicket(t.assunto, t.descricao), t.empreendimentos),
+        esquema: ESQUEMA_EMPREENDIMENTO,
+      });
+      const c = validarIdentificacao(r.json, t.empreendimentos);
+      registro = c
+        ? { ...c, modelo: r.modelo, tokensEntrada: r.tokensEntrada, tokensSaida: r.tokensSaida, ms: Date.now() - inicio }
+        : { erro: "Resposta da IA fora do formato.", modelo: r.modelo, ms: Date.now() - inicio };
+    } catch (e) {
+      registro = { erro: String(e instanceof Error ? e.message : e).slice(0, 500), modelo, ms: Date.now() - inicio };
+    }
+    const g = await db.rpc("ch_ia_empreendimento_registrar", { p_ticket: t.ticketId, p: registro });
+    empreendimentos.push({ ticket: t.ticketId, ...(g.error ? { erro: g.error.message } : (g.data as Record<string, unknown>)) });
+  }
+  if (empreendimentos.length) console.log(JSON.stringify({ evento: "ia.empreendimento", resultados: empreendimentos }));
+  return { resultados, empreendimentos };
+}

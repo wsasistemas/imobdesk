@@ -125,7 +125,7 @@ export function DesignSystem() {
     <div className="ds ds-showcase">
       <header className="ds-showcase__header">
         <div className="ds-eyebrow">DESIGN SYSTEM</div>
-        <h1 className="ds-h1">Portal Atendimento</h1>
+        <h1 className="ds-h1">Imobdesk</h1>
         <p className="ds-muted">Tokens e componentes do dashboard (src/components/ds). Só em desenvolvimento.</p>
       </header>
 

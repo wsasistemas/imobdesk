@@ -5,7 +5,7 @@
 // Edge Function não serve HTML no domínio do Supabase: no fim, redireciona para a rota /oauth/google do portal,
 // que avisa a janela que abriu a autorização e se fecha.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { clienteDaEmpresa, empresaPor } from "../_shared/empresa.ts";
 import { APP_GOOGLE_AUSENTE, appGoogleDe, testarGmailComToken, trocarCodigo } from "../_shared/email/gmail.ts";
 
 const texto = (status: number, msg: string) => new Response(msg, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -15,11 +15,14 @@ Deno.serve(async (req) => {
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return texto(500, "Função sem configuração do Supabase.");
-  const db = createClient(url, key, { db: { schema: "imobdesk" }, auth: { persistSession: false, autoRefreshToken: false } });
 
   const q = new URL(req.url).searchParams;
   const state = q.get("state") ?? "";
   if (!/^[a-f0-9]{64}$/.test(state)) return texto(400, "Link inválido. Volte ao portal e clique em Autorizar com Gmail de novo.");
+  // O state foi criado na empresa de quem pediu a autorização: o resto acontece nela.
+  const empresaId = await empresaPor("empresa_por_estado_oauth", { p_state: state }).catch(() => null);
+  if (!empresaId) return texto(400, "Este link expirou ou já foi usado. Volte ao portal e clique em Autorizar com Gmail de novo.");
+  const db = clienteDaEmpresa(empresaId);
   const est = await db.rpc("at_email_oauth_estado_consumir", { p_state: state });
   const e = (est.data as { conta_id: number; usuario_id: string; retorno: string; email: string }[] | null)?.[0];
   if (est.error || !e) return texto(400, "Este link expirou ou já foi usado. Volte ao portal e clique em Autorizar com Gmail de novo.");

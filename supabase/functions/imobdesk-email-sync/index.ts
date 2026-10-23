@@ -9,7 +9,7 @@
 // a resposta ao ticket. Envio: ações públicas pendentes dos tickets de e-mail, com [#ticket] no assunto e
 // In-Reply-To/References na mesma conversa do cliente.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { clienteServico, paraCadaEmpresa } from "../_shared/empresa.ts";
 import { corsHeaders, errorResponse, fromRpcError, json, PortalError, portalContext, type AdminClient } from "../_shared/portal.ts";
 import { APP_GOOGLE_AUSENTE, appGoogleDe, enviarGmail, erroGoogle, tokenPorRefresh } from "../_shared/email/gmail.ts";
 import { lerMensagem, motivoIgnorar, nomeSeguro, type MensagemGmail } from "../_shared/email/leitura.ts";
@@ -126,7 +126,7 @@ async function lerConta(db: AdminClient, token: string, c: Conta) {
           try {
             const data = a.data ?? (await gmail<{ data: string }>(token, `/messages/${id}/attachments/${a.attachmentId}`)).data;
             const path = `${c.id}/${id}/${nomeSeguro(a.nome)}`;
-            const up = await db.storage.from("atendimento-email").upload(path, bytesDe(data), { contentType: a.mime, upsert: true });
+            const up = await db.storage.from("imobdesk-atendimento-email").upload(path, bytesDe(data), { contentType: a.mime, upsert: true });
             if (up.error) throw new Error(up.error.message);
             anexos.push({ nome: a.nome, mime: a.mime, tamanho: a.tamanho, path });
           } catch (err) {
@@ -262,55 +262,59 @@ async function enviarPendentes(db: AdminClient, app: { clientId: string; clientS
   return resumo;
 }
 
+/** Um ciclo de leitura e envio numa empresa (db já preso a ela). */
+async function ciclo(db: AdminClient, contaId?: number) {
+  let consulta = db
+    .from("at_email_contas")
+    .select("id, email, oauth_email, pasta, ler_desde, cursor, marcar_lido, ignorar_remetentes")
+    .eq("habilitada", true)
+    .eq("receber_habilitado", true)
+    .eq("modo", "oauth_google")
+    .not("oauth_segredo_id", "is", null);
+  if (contaId) consulta = consulta.eq("id", contaId);
+  const contas = await consulta;
+  if (contas.error) throw new Error(contas.error.message);
+
+  const app = await appOAuth(db);
+  const leitura: Record<string, unknown> = {};
+  for (const c of (contas.data ?? []) as Conta[]) {
+    try {
+      leitura[c.email] = await lerConta(db, await tokenDa(db, app, c.id), c);
+    } catch (err) {
+      leitura[c.email] = { erro: msg(err) };
+      await db.from("at_email_contas").update({ status: "falha", ultimo_erro: msg(err).slice(0, 1000) }).eq("id", c.id);
+    }
+  }
+  const envio = await enviarPendentes(db, app, contaId);
+  return { leitura, envio };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ code: "INVALID_INPUT", message: "Método não suportado." }, 405);
   try {
-    const url = Deno.env.get("SUPABASE_URL");
-    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!url || !key) throw new PortalError("INTERNAL", "Função sem configuração do Supabase.", 500);
-    let db: AdminClient = createClient(url, key, { db: { schema: "imobdesk" }, auth: { persistSession: false, autoRefreshToken: false } });
-
-    // Quem chama: o pg_cron (chave do Vault) ou a supervisão geral logada ("Ler agora").
-    const chave = await db.rpc("at_email_cron_chave");
-    if (!iguais(req.headers.get("x-atendimento-chave") ?? "", (chave.data as string | null) ?? "")) {
-      const { caller, admin } = await portalContext(req);
-      const [perfil, sup] = await Promise.all([
-        admin.rpc("perfil_de", { p_usuario: caller.id }),
-        admin.rpc("tem_permissao_de", { p_usuario: caller.id, p_permissao: "gestao_atendimento_supervisao" }),
-      ]);
-      if (!(perfil.data === "super_admin" || sup.data === true)) throw new PortalError("FORBIDDEN", "Só a supervisão geral lê as caixas agora.", 403);
-      db = admin;
-    }
-
     const corpo = (await req.json().catch(() => ({}))) as { acao?: string; contaId?: number };
     if ((corpo.acao ?? "ciclo") !== "ciclo") throw new PortalError("INVALID_INPUT", `Ação inválida: ${corpo.acao}`);
     const contaId = Number(corpo.contaId ?? 0) || undefined;
 
-    let consulta = db
-      .from("at_email_contas")
-      .select("id, email, oauth_email, pasta, ler_desde, cursor, marcar_lido, ignorar_remetentes")
-      .eq("habilitada", true)
-      .eq("receber_habilitado", true)
-      .eq("modo", "oauth_google")
-      .not("oauth_segredo_id", "is", null);
-    if (contaId) consulta = consulta.eq("id", contaId);
-    const contas = await consulta;
-    if (contas.error) throw new Error(contas.error.message);
-
-    const app = await appOAuth(db);
-    const leitura: Record<string, unknown> = {};
-    for (const c of (contas.data ?? []) as Conta[]) {
-      try {
-        leitura[c.email] = await lerConta(db, await tokenDa(db, app, c.id), c);
-      } catch (err) {
-        leitura[c.email] = { erro: msg(err) };
-        await db.from("at_email_contas").update({ status: "falha", ultimo_erro: msg(err).slice(0, 1000) }).eq("id", c.id);
-      }
+    // Quem chama: o pg_cron (chave do Vault), que roda em todas as empresas, ou a supervisão geral logada
+    // ("Ler agora"), só na empresa dela.
+    const chave = await clienteServico().rpc("at_email_cron_chave");
+    if (iguais(req.headers.get("x-atendimento-chave") ?? "", (chave.data as string | null) ?? "")) {
+      const resultado = await paraCadaEmpresa((db) => ciclo(db));
+      console.log(JSON.stringify({ evento: "email.ciclo", resultado }));
+      return json(resultado);
     }
-    const envio = await enviarPendentes(db, app, contaId);
-    console.log(JSON.stringify({ evento: "email.ciclo", leitura, envio }));
-    return json({ leitura, envio });
+
+    const { caller, admin } = await portalContext(req);
+    const [perfil, sup] = await Promise.all([
+      admin.rpc("perfil_de", { p_usuario: caller.id }),
+      admin.rpc("tem_permissao_de", { p_usuario: caller.id, p_permissao: "gestao_atendimento_supervisao" }),
+    ]);
+    if (!(perfil.data === "super_admin" || sup.data === true)) throw new PortalError("FORBIDDEN", "Só a supervisão geral lê as caixas agora.", 403);
+    const resultado = await ciclo(admin, contaId);
+    console.log(JSON.stringify({ evento: "email.ciclo", resultado }));
+    return json(resultado);
   } catch (error) {
     return errorResponse(error);
   }

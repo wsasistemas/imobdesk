@@ -59,8 +59,14 @@ Status: mockup v2 aprovado, foto B (suporte) escolhida e P1 a P3 respondidos em 
 
 ### Fase 3 — Edge Functions e agendamentos
 - [x] 15 funções renomeadas para `imobdesk-*`; `movidesk` e a do site saem; gateway de login sem domínio fixo (`dominio_permitido`).
-- [ ] `portalContext` e as funções de agendamento/webhook informam a empresa (`x-empresa-id`): o usuário logado pela empresa dele; ciclos do agendamento percorrendo as empresas; webhooks pela empresa do número ou da conta.
-- [ ] Storage com a pasta da empresa no caminho dos arquivos.
+- [x] Empresa em toda chamada (`_shared/empresa.ts`):
+  - `portalContext` usa a empresa de quem chama;
+  - os ciclos do pg_cron (e-mail, IA, WhatsApp e e-mail das Solicitações) percorrem as empresas;
+  - Zenvia acha a empresa pelo número ou pela mensagem; OpenWA, pela sessão; retorno do Google, pelo `state`.
+  - O cliente da empresa filtra `tenant_id` em todo select, update e delete direto nas tabelas (o `service_role` ignora a RLS).
+  - Migration `…000200_imobdesk_empresa_edge` + `supabase/sql-editor/atualizacao_20261024000200.sql`.
+- [ ] Rodar `atualizacao_20261024000200.sql` no SQL Editor do ikvj (pendência sua, antes do deploy).
+- [ ] Storage com a pasta da empresa no caminho dos arquivos. Hoje as policies conferem só a permissão: quem tem a permissão numa empresa e adivinha o caminho de um arquivo de outra consegue ler.
 - [ ] Deploy no ikvj com o token temporário da conta WSA, pelo workflow `supabase-deploy-functions-em-projeto-de-outra-conta-token-temporario-powershell` do Cerebro.
 - [ ] Agendamentos `imobdesk-*` criados depois do deploy.
 

@@ -79,7 +79,7 @@ function Form({ onDone }: { onDone: () => void }) {
         <summary>Como a TI obtém o ID e a chave (Google Cloud Console, uma vez)</summary>
         <ol>
           <li>APIs e serviços › ative a <b>Gmail API</b>.</li>
-          <li>Tela de consentimento OAuth › tipo de usuário <b>Interno</b>. Nome: "Portal Atendimento".</li>
+          <li>Tela de consentimento OAuth › tipo de usuário <b>Interno</b>. Nome: "Imobdesk".</li>
           <li>
             Credenciais › Criar credenciais › <b>ID do cliente OAuth</b> › <b>Aplicativo da Web</b>. Em URIs de redirecionamento autorizados, cole:
             <Copiar texto={redirect} />

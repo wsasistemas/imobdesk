@@ -6,7 +6,7 @@
 // Sem conta configurada, os e-mails continuam na fila (o aviso no sino do portal já foi dado) até a conta existir.
 // Link no texto: caminhos "/financeiro/..." ganham o endereço do portal quando a variável PORTAL_URL estiver definida.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { clienteServico, paraCadaEmpresa } from "../_shared/empresa.ts";
 import { corsHeaders, errorResponse, fromRpcError, json, PortalError, type AdminClient } from "../_shared/portal.ts";
 import { APP_GOOGLE_AUSENTE, appGoogleDe, enviarGmail, tokenPorRefresh } from "../_shared/email/gmail.ts";
 import { montarMensagem, novoMessageId } from "../_shared/email/mime.ts";
@@ -43,55 +43,54 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ code: "INVALID_INPUT", message: "Método não suportado." }, 405);
   try {
-    const url = Deno.env.get("SUPABASE_URL");
-    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!url || !key) throw new PortalError("INTERNAL", "Função sem configuração do Supabase.", 500);
-    const db: AdminClient = createClient(url, key, { db: { schema: "imobdesk" }, auth: { persistSession: false, autoRefreshToken: false } });
-
-    const chave = await db.rpc("at_email_cron_chave");
+    const chave = await clienteServico().rpc("at_email_cron_chave");
     if (!iguais(req.headers.get("x-atendimento-chave") ?? "", (chave.data as string | null) ?? "")) {
       throw new PortalError("FORBIDDEN", "Chamada não autorizada.", 403);
     }
-
-    const { data, error } = await db.rpc("sf_email_para_enviar", { p_limite: 30 });
-    if (error) throw fromRpcError(error);
-    const fila = data as Fila;
-    if (!fila.itens.length) return json({ enviados: 0, falhas: 0 });
-    if (!fila.conta) {
-      console.log(JSON.stringify({ evento: "sf.email.sem_conta", pendentes: fila.itens.length }));
-      return json({ enviados: 0, falhas: 0, pendentes: fila.itens.length, aviso: "Sem conta de e-mail no setor financeiro." });
-    }
-
-    const portal = (Deno.env.get("PORTAL_URL") ?? "").replace(/\/+$/, "");
-    const acesso = await token(db, fila.conta.id);
-    const resumo = { enviados: 0, falhas: 0 };
-    for (const x of fila.itens) {
-      let ok = false;
-      let erro: string | null = null;
-      try {
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.para)) throw new Error("E-mail do destinatário inválido.");
-        const texto = portal ? x.texto.replace(/(^|\s)(\/financeiro\/\S+)/g, (_m, a: string, c: string) => `${a}${portal}${c}`) : x.texto;
-        const raw = montarMensagem({
-          de: fila.conta.email,
-          deNome: fila.conta.remetente,
-          para: [x.para],
-          assunto: x.assunto,
-          texto,
-          messageId: novoMessageId(fila.conta.email.split("@")[1] ?? "imobsystems.com.br"),
-        });
-        await enviarGmail(fetch, acesso, raw);
-        ok = true;
-        resumo.enviados++;
-      } catch (e) {
-        erro = msg(e);
-        resumo.falhas++;
-      }
-      const r = await db.rpc("sf_email_resultado", { p_id: x.id, p_ok: ok, p_erro: erro });
-      if (r.error) console.error(JSON.stringify({ evento: "sf.email.resultado_falhou", id: x.id, erro: r.error.message }));
-    }
-    console.log(JSON.stringify({ evento: "sf.email.ciclo", ...resumo }));
-    return json(resumo);
+    // Cada empresa envia a própria fila pela caixa do Financeiro dela.
+    return json(await paraCadaEmpresa((db) => enviarFila(db)));
   } catch (error) {
     return errorResponse(error);
   }
 });
+
+async function enviarFila(db: AdminClient) {
+  const { data, error } = await db.rpc("sf_email_para_enviar", { p_limite: 30 });
+  if (error) throw fromRpcError(error);
+  const fila = data as Fila;
+  if (!fila.itens.length) return { enviados: 0, falhas: 0 };
+  if (!fila.conta) {
+    console.log(JSON.stringify({ evento: "sf.email.sem_conta", pendentes: fila.itens.length }));
+    return { enviados: 0, falhas: 0, pendentes: fila.itens.length, aviso: "Sem conta de e-mail no setor financeiro." };
+  }
+
+  const portal = (Deno.env.get("PORTAL_URL") ?? "").replace(/\/+$/, "");
+  const acesso = await token(db, fila.conta.id);
+  const resumo = { enviados: 0, falhas: 0 };
+  for (const x of fila.itens) {
+    let ok = false;
+    let erro: string | null = null;
+    try {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.para)) throw new Error("E-mail do destinatário inválido.");
+      const texto = portal ? x.texto.replace(/(^|\s)(\/financeiro\/\S+)/g, (_m, a: string, c: string) => `${a}${portal}${c}`) : x.texto;
+      const raw = montarMensagem({
+        de: fila.conta.email,
+        deNome: fila.conta.remetente,
+        para: [x.para],
+        assunto: x.assunto,
+        texto,
+        messageId: novoMessageId(fila.conta.email.split("@")[1] ?? "imobsystems.com.br"),
+      });
+      await enviarGmail(fetch, acesso, raw);
+      ok = true;
+      resumo.enviados++;
+    } catch (e) {
+      erro = msg(e);
+      resumo.falhas++;
+    }
+    const r = await db.rpc("sf_email_resultado", { p_id: x.id, p_ok: ok, p_erro: erro });
+    if (r.error) console.error(JSON.stringify({ evento: "sf.email.resultado_falhou", id: x.id, erro: r.error.message }));
+  }
+  console.log(JSON.stringify({ evento: "sf.email.ciclo", ...resumo }));
+  return resumo;
+}

@@ -4,6 +4,7 @@
 // (ver Cerebro: supabase-verify-jwt-aceita-chave-anon-checar-papel-na-funcao). Por isso cada
 // função confere o USUÁRIO do token (auth.getUser) e a permissão dele no portal.
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
+import { clienteDaEmpresa, empresaDoUsuario } from "./empresa.ts";
 
 /** Cliente service_role no schema imobdesk (sem tipos gerados do banco). */
 // deno-lint-ignore no-explicit-any
@@ -50,8 +51,10 @@ export function fromRpcError(error: { message: string; details?: string | null; 
 
 export interface PortalContext {
   caller: User;
-  /** service_role: ignora RLS; usar só depois de validar o chamador. */
+  /** service_role preso à empresa de quem chama (ver _shared/empresa.ts); usar só depois de validar o chamador. */
   admin: AdminClient;
+  /** Empresa aberta por quem chama (a do seletor do topo). */
+  empresaId: string;
 }
 
 export async function portalContext(req: Request): Promise<PortalContext> {
@@ -82,7 +85,9 @@ export async function portalContext(req: Request): Promise<PortalContext> {
   });
   if (sessaoError || valida !== true) throw new PortalError("UNAUTHENTICATED", "Sessão inválida. Faça login novamente.", 401);
 
-  return { caller: data.user, admin };
+  const empresaId = await empresaDoUsuario(data.user.id);
+  if (!empresaId) throw new PortalError("FORBIDDEN", "Seu login não tem acesso a nenhuma empresa no Imobdesk.", 403);
+  return { caller: data.user, admin: clienteDaEmpresa(empresaId), empresaId };
 }
 
 /** Payload do JWT (a assinatura já foi conferida pelo auth.getUser acima). */

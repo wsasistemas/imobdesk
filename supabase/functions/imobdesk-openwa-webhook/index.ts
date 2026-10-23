@@ -4,12 +4,13 @@
 //   grupo interno de atendentes     → at_grupo_receber (resposta citando o pedido vai ao colaborador)
 //   digitada no celular do número   → at_whatsapp_propria (resposta do atendente; "RESOLVIDO" encerra resolvendo)
 // Depois envia na hora o que ficou pendente (resposta automática, repasse). Idempotente pelo idempotencyKey.
+// Multiempresa: a empresa sai da sessão do OpenWA (o número dela em Setores e números); sem empresa, só log.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { despachar } from "../_shared/atendimento/despacho.ts";
+import { clienteDaEmpresa, clienteServico, empresaPor } from "../_shared/empresa.ts";
 import { assinaturaValida, baixarMidiaOpenwa, bytesDeBase64, caminhoMidia, lerEventoOpenwa } from "../_shared/atendimento/openwa.ts";
 
-const BUCKET = "atendimento-whatsapp";
+const BUCKET = "imobdesk-atendimento-whatsapp";
 const MIDIA_MAX = 15 * 1_048_576;
 
 const resposta = (status: number, corpo: Record<string, unknown>) =>
@@ -17,21 +18,16 @@ const resposta = (status: number, corpo: Record<string, unknown>) =>
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return resposta(405, { erro: "Método não suportado." });
-  const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) return resposta(500, { erro: "Função sem configuração do Supabase." });
-  const db = createClient(url, key, { db: { schema: "imobdesk" }, auth: { persistSession: false, autoRefreshToken: false } });
+  if (!Deno.env.get("SUPABASE_URL") || !Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+    return resposta(500, { erro: "Função sem configuração do Supabase." });
+  }
+  type Credencial = { url: string | null; chave: string | null; webhook_segredo: string | null };
 
-  // Corpo bruto ANTES do JSON.parse: a assinatura é sobre os bytes recebidos.
+  // Corpo bruto ANTES do JSON.parse: a assinatura é sobre os bytes recebidos. O segredo é um só para o app.
   const bruto = await req.text();
-  const cred = await db.rpc("at_ler_credencial_openwa");
-  const credLinha = (cred.data as { url: string | null; chave: string | null; webhook_segredo: string | null }[] | null)?.[0];
-  const segredo = credLinha?.webhook_segredo ?? "";
+  const geral = await clienteServico().rpc("at_ler_credencial_openwa");
+  const segredo = (geral.data as Credencial[] | null)?.[0]?.webhook_segredo ?? "";
   if (!(await assinaturaValida(segredo, bruto, req.headers.get("x-openwa-signature")))) return resposta(401, { erro: "Assinatura inválida." });
-
-  // Chave geral desligada pelo administrador: não grava nem processa nada (200 para o OpenWA não reenviar).
-  const ligado = await db.rpc("at_openwa_ligado");
-  if (ligado.data === false) return resposta(200, { ok: true, ignorado: "WhatsApp OpenWA desligado" });
 
   let envelope: unknown;
   try {
@@ -41,6 +37,19 @@ Deno.serve(async (req) => {
   }
   const ev = lerEventoOpenwa(envelope);
   const e = envelope as Record<string, unknown>;
+
+  const empresaId = ev.sessao ? await empresaPor("empresa_por_sessao_openwa", { p_sessao: ev.sessao }) : null;
+  if (!empresaId) {
+    console.log(JSON.stringify({ evento: "openwa.webhook_sem_empresa", sessao: ev.sessao ?? null }));
+    return resposta(200, { ok: true, ignorado: "Sessão sem empresa no Imobdesk." });
+  }
+  const db = clienteDaEmpresa(empresaId);
+  const cred = await db.rpc("at_ler_credencial_openwa");
+  const credLinha = (cred.data as Credencial[] | null)?.[0];
+
+  // Chave geral desligada pelo administrador da empresa: não grava nem processa nada (200 para o OpenWA não reenviar).
+  const ligado = await db.rpc("at_openwa_ligado");
+  if (ligado.data === false) return resposta(200, { ok: true, ignorado: "WhatsApp OpenWA desligado" });
 
   const ins = await db
     .from("at_eventos_openwa")

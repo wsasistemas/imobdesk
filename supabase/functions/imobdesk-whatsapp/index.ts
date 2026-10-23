@@ -9,6 +9,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, errorResponse, fromRpcError, json, PortalError, portalContext, type AdminClient } from "../_shared/portal.ts";
 import { despachar } from "../_shared/atendimento/despacho.ts";
+import { paraCadaEmpresa } from "../_shared/empresa.ts";
 import { chamarOpenwa, iguais } from "../_shared/atendimento/openwa.ts";
 
 const WEBHOOK = "imobdesk-openwa-webhook";
@@ -44,24 +45,28 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ code: "INVALID_INPUT", message: "Método não suportado." }, 405);
   try {
-    const db = servico();
+    const base = servico();
     const corpo = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const acao = String(corpo.acao ?? "");
 
     // ---------- agendador ----------
     const chaveCron = req.headers.get("x-atendimento-chave");
     if (chaveCron) {
-      const { data } = await db.rpc("at_whatsapp_cron_chave");
+      const { data } = await base.rpc("at_whatsapp_cron_chave");
       if (!iguais(chaveCron, (data as string | null) ?? "")) throw new PortalError("UNAUTHENTICATED", "Agendador não autorizado.", 401);
       if (acao !== "ciclo") throw new PortalError("INVALID_INPUT", `Ação inválida para o agendador: ${acao}`);
-      const ciclo = await db.rpc("at_whatsapp_ciclo");
-      if (ciclo.error) console.error(JSON.stringify({ evento: "whatsapp.ciclo_falhou", erro: ciclo.error.message }));
-      const envio = await despachar(db, { limite: 60 });
-      return json({ ciclo: ciclo.data ?? null, envio });
+      // Uma rodada por empresa, cada uma com os próprios números, filas e credenciais.
+      return json(await paraCadaEmpresa(async (db) => {
+        const ciclo = await db.rpc("at_whatsapp_ciclo");
+        if (ciclo.error) console.error(JSON.stringify({ evento: "whatsapp.ciclo_falhou", erro: ciclo.error.message }));
+        const envio = await despachar(db, { limite: 60 });
+        return { ciclo: ciclo.data ?? null, envio };
+      }));
     }
 
-    // ---------- pessoa logada ----------
+    // ---------- pessoa logada (só na empresa dela) ----------
     const { caller, admin } = await portalContext(req);
+    const db = admin;
     if (acao === "despachar") {
       const conversaId = corpo.conversaId ? Number(corpo.conversaId) : null;
       return json(await despachar(db, { conversaId, limite: 20 }));

@@ -10,7 +10,7 @@ import { corsHeaders, errorResponse, json, PortalError, portalContext } from "..
 import { blocoDoArquivo, ESQUEMA_LEITURA, INSTRUCOES, montarPedido, normalizarLeitura, validarLeitura, type Categoria, type ModoLeitura } from "../_shared/sf/ocr.ts";
 
 const MODELO = "claude-opus-5-5";
-const BUCKET = "sf-comprovantes";
+const BUCKET = "imobdesk-sf-comprovantes";
 /** Limite da API por imagem em base64; PDF vai até o limite do bucket (10 MB). */
 const IMAGEM_MAX = 5 * 1024 * 1024;
 

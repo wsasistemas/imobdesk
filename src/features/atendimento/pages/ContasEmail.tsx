@@ -475,7 +475,7 @@ function FormConta({
                   )}
                 </div>
                 {appFalta && <p className="em-aviso" role="note">O Aplicativo do Google ainda não foi configurado. {isSuperAdmin ? "Configure em Central Email › Opções › Aplicativo do Google (chaves)." : "Peça ao super admin para configurar (uma vez)."}</p>}
-                <p className="em-nota"><Info size={15} aria-hidden="true" />Este provedor utiliza autenticação segura via OAuth2. Por isso, é necessário conceder ao Portal Atendimento autorização para acessar suas informações, enviar e receber e-mails no seu nome. Essa autorização pode ser revogada a qualquer momento.</p>
+                <p className="em-nota"><Info size={15} aria-hidden="true" />Este provedor utiliza autenticação segura via OAuth2. Por isso, é necessário conceder ao Imobdesk autorização para acessar suas informações, enviar e receber e-mails no seu nome. Essa autorização pode ser revogada a qualquer momento.</p>
               </div>
             ) : (
               <>

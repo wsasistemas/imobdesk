@@ -17,7 +17,7 @@ import {
 } from "../_shared/sf/sienge.ts";
 import { gerarPdf, type DadosPdf } from "./pdf.ts";
 
-const BUCKET = "sf-comprovantes";
+const BUCKET = "imobdesk-sf-comprovantes";
 const TIMEOUT = 30_000;
 
 interface Corpo {
@@ -74,8 +74,12 @@ async function pdfDe(req: Request, id: number): Promise<Uint8Array<ArrayBuffer>>
   const r = await comoUsuario(req).rpc("sf_pdf_dados", { p_id: id });
   if (r.error) throw new PortalError("NOT_FOUND", "Solicitação não encontrada.", 404);
   const d = r.data as DadosPdf & { totalDespesas: number | string };
+  // Nome da empresa aberta por quem pediu (cabeçalho do formulário).
+  const pref = await comoUsuario(req).rpc("minhas_preferencias");
+  const empresa = (pref.data as { empresaNome?: string | null } | null)?.empresaNome ?? undefined;
   const bytes = await gerarPdf({
     ...d,
+    empresa,
     totalDespesas: Number(d.totalDespesas), valorGlosado: Number(d.valorGlosado), valorAPagar: d.valorAPagar == null ? null : Number(d.valorAPagar),
     valorFundoFixo: d.valorFundoFixo == null ? null : Number(d.valorFundoFixo), saldoInicial: d.saldoInicial == null ? null : Number(d.saldoInicial),
     saldoFinal: d.saldoFinal == null ? null : Number(d.saldoFinal), itens: d.itens.map((i) => ({ ...i, valor: i.valor == null ? null : Number(i.valor) })),
@@ -199,7 +203,7 @@ Deno.serve(async (req) => {
             avisos.push(`${nome}: ${e instanceof Error ? e.message : String(e)}`);
           }
         };
-        await anexar(`${p.numero}-formulario.pdf`, new Blob([await pdfDe(req, id)], { type: "application/pdf" }), `Formulário ${p.numero} (Portal de Tickets)`);
+        await anexar(`${p.numero}-formulario.pdf`, new Blob([await pdfDe(req, id)], { type: "application/pdf" }), `Formulário ${p.numero} (Imobdesk)`);
         const rotulo = (a: { finalidade?: string; ordem: number }) =>
           a.finalidade === "documento_origem" ? "Documento de origem" : a.finalidade === "comprovacao" ? "Nota da comprovação" : `Comprovante da linha ${a.ordem}`;
         for (const a of p.anexos) {

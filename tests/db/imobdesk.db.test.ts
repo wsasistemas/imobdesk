@@ -105,8 +105,9 @@ describe("estrutura", () => {
                                   and pg_get_userbyid(p.proowner) <> 'imobdesk_dono' order by 1`);
     expect(doPostgres.map((f) => f.proname)).toEqual([
       "aplicar_multiempresa", "criar_empresa", "dominio_permitido", "eh_admin_wsa", "empresa_atual", "empresa_copiar_modelo",
-      "encerrar_sessao", "listar_empresas_wsa", "minhas_empresas", "minhas_preferencias", "para_cada_empresa", "salvar_tema",
-      "security_password_verification_hook", "trocar_empresa",
+      "empresa_de", "empresa_por_estado_oauth", "empresa_por_mensagem_zenvia", "empresa_por_numero", "empresa_por_sessao_openwa",
+      "empresas_ativas", "encerrar_sessao", "listar_empresas_wsa", "minhas_empresas", "minhas_preferencias", "para_cada_empresa",
+      "salvar_tema", "security_password_verification_hook", "trocar_empresa",
     ]);
     expect((await q(`select rolbypassrls b from pg_roles where rolname = 'imobdesk_dono'`))[0].b).toBe(false);
   });
@@ -242,5 +243,38 @@ describe("isolamento entre empresas", () => {
     const n = await q(`select imobdesk.para_cada_empresa('imobdesk.ch_gatilhos_tempo') n`);
     expect(n[0].n).toBe(2);
     await expect(q(`select imobdesk.para_cada_empresa('imobdesk.x(); drop table y')`)).rejects.toThrow(/inválida/);
+  });
+});
+
+describe("Edge Functions descobrem a empresa", () => {
+  const comoServico = <T>(fn: (c: pg.Client) => Promise<T>) => asUser(db.admin, { role: "service_role" }, fn);
+
+  it("empresa_de: a mesma regra do usuário logado (seletor, cadastro, domínio)", async () => {
+    const r = await comoServico((c) => um(c, `select imobdesk.empresa_de($1) duplo, imobdesk.empresa_de($2) sol, imobdesk.empresa_de($3) fora`,
+      [ids.duplo, ids.solicitante, ids.outroSistema]));
+    expect(r.duplo).not.toBeNull();
+    expect(r.sol).toBe(empresa.A);
+    expect(r.fora).toBeNull();
+    const lista = await comoServico(async (c) => (await c.query(`select nome from imobdesk.empresas_ativas()`)).rows.map((e) => e.nome));
+    expect(lista).toEqual(expect.arrayContaining(["Construtora Alfa", "Imobiliária Beta"]));
+    expect(lista).not.toContain("Modelo");
+  });
+
+  it("webhook: número de WhatsApp, sessão do OpenWA e state do Google levam à empresa certa", async () => {
+    await db.admin.query("begin");
+    await db.admin.query("select set_config('imobdesk.empresa_id', $1, true)", [empresa.B]);
+    const setor = (await db.admin.query(`select id from imobdesk.at_setores order by id limit 1`)).rows[0].id;
+    await db.admin.query(`insert into imobdesk.at_numeros (setor_id, numero, openwa_sessao) values ($1, '5521999990002', 'sessao-beta')`, [setor]);
+    const conta = (await db.admin.query(`insert into imobdesk.at_email_contas (nome, email) values ('Suporte Beta', 'suporte@beta.com.br') returning id`)).rows[0].id;
+    await db.admin.query(`insert into imobdesk.at_email_oauth_estados (state, conta_id, usuario_id, retorno) values ('st-beta', $1, $2, 'https://x.y')`, [conta, ids.adminB]);
+    await db.admin.query("commit");
+    const r = await comoServico((c) => um(c, `select imobdesk.empresa_por_numero('(21) 99999-0002') num, imobdesk.empresa_por_sessao_openwa('sessao-beta') ses,
+      imobdesk.empresa_por_estado_oauth('st-beta') st, imobdesk.empresa_por_numero('5511000000000') nada`));
+    expect(r).toEqual({ num: empresa.B, ses: empresa.B, st: empresa.B, nada: null });
+  });
+
+  it("só o service_role descobre empresas", async () => {
+    expect(await erroDe(ids.adminA, `select imobdesk.empresas_ativas()`)).toMatch(/permission denied/);
+    expect(await erroDe(ids.adminA, `select imobdesk.empresa_de($1)`, [ids.adminB])).toMatch(/permission denied/);
   });
 });

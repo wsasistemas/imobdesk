@@ -119,13 +119,13 @@ export function montarTitulo(p: PedidoLancamento, c: ConfigSienge, e: EscolhasLa
         p.pedidoNumero ? `Pedido ${p.pedidoNumero}` : null,
         p.notaNumero ? `Nota ${p.notaNumero}` : null,
         p.finalidade ?? null,
-        "Lançado pelo Portal de Tickets (Solicitações Financeiras)",
+        "Lançado pelo Imobdesk (Solicitações Financeiras)",
       ]
     : [
         `${TIPO[p.tipo]} ${p.numero} - ${p.solicitante}`,
         p.setor ? `Setor ${p.setor}` : null,
         p.glosado > 0 ? `Total ${p.total.toFixed(2)} - glosas ${p.glosado.toFixed(2)}` : null,
-        "Lançado pelo Portal de Tickets (Solicitações Financeiras)",
+        "Lançado pelo Imobdesk (Solicitações Financeiras)",
       ]).filter(Boolean).join(" · ");
   const obra = apropriacaoObra(p, e);
   return {

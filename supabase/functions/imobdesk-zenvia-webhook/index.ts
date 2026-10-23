@@ -4,9 +4,11 @@
 // F3 (06/10/2026): grava o evento cru em at_eventos_zenvia (idempotente por tipo + id da Zenvia) e atualiza
 // o status das mensagens enviadas. Fase 2 do chat (09/10/2026): a mensagem recebida vai para at_whatsapp_receber
 // (identificação, fila, ticket) e o que ficou pendente (resposta automática) sai na hora pelo despachante.
+// Multiempresa: a empresa sai do número que recebeu (mensagem) ou da mensagem enviada (status); evento sem
+// empresa (número que não está em nenhum setor) só vai para o log.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { despachar } from "../_shared/atendimento/despacho.ts";
+import { clienteDaEmpresa, clienteServico, empresaPor } from "../_shared/empresa.ts";
 import { lerEvento } from "../_shared/atendimento/zenvia.ts";
 
 const resposta = (status: number, corpo: Record<string, unknown>) =>
@@ -22,12 +24,12 @@ function iguais(a: string, b: string): boolean {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return resposta(405, { erro: "Método não suportado." });
-  const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) return resposta(500, { erro: "Função sem configuração do Supabase." });
-  const db = createClient(url, key, { db: { schema: "imobdesk" }, auth: { persistSession: false, autoRefreshToken: false } });
+  if (!Deno.env.get("SUPABASE_URL") || !Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+    return resposta(500, { erro: "Função sem configuração do Supabase." });
+  }
 
-  const cred = await db.rpc("at_ler_credencial_zenvia");
+  // A chave do webhook é uma só para o app; o token de cada empresa fica na configuração dela.
+  const cred = await clienteServico().rpc("at_ler_credencial_zenvia");
   const chave = (cred.data as { webhook_chave: string | null }[] | null)?.[0]?.webhook_chave ?? "";
   if (!iguais(req.headers.get("x-atendimento-chave") ?? "", chave)) return resposta(401, { erro: "Chave inválida." });
 
@@ -36,6 +38,17 @@ Deno.serve(async (req) => {
   const evento = lerEvento(payload);
   const p = payload as Record<string, unknown>;
   const m = (p.message ?? {}) as Record<string, unknown>;
+
+  const empresaId = evento.tipo === "mensagem"
+    ? await empresaPor("empresa_por_numero", { p_numero: evento.para })
+    : evento.tipo === "status"
+    ? await empresaPor("empresa_por_mensagem_zenvia", { p_zenvia_id: evento.zenviaId })
+    : null;
+  if (!empresaId) {
+    console.log(JSON.stringify({ evento: "atendimento.webhook_sem_empresa", tipo: String(p.type ?? "?"), detalhe: evento.tipo }));
+    return resposta(200, { ok: true, ignorado: "Evento sem empresa no Imobdesk." });
+  }
+  const db = clienteDaEmpresa(empresaId);
 
   const zenviaId = evento.tipo === "ignorado" ? (String(p.messageId ?? m.id ?? p.id ?? "") || null) : evento.zenviaId || null;
   const ins = await db.from("at_eventos_zenvia").insert({

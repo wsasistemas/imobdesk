@@ -1,7 +1,8 @@
 // Junta supabase/migrations em partes para colar no SQL Editor do ikvj (o projeto é compartilhado: nada de db push).
 // Cada parte roda numa transação: se der erro, nada daquela parte fica gravado. Rode as partes na ordem.
-// Uso: node scripts/montar-sql-editor.mjs [--desde <prefixo do arquivo>]
-//   --desde: só as migrations a partir daquela (ex.: --desde 20261025 para aplicar só as novas).
+// Uso: node scripts/montar-sql-editor.mjs                 → 1_estrutura_parte*.sql (banco novo, do zero)
+//      node scripts/montar-sql-editor.mjs --desde <prefixo> → atualizacao_<prefixo>.sql (só as migrations novas,
+//                                                             para um banco que já rodou as partes anteriores)
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -29,10 +30,11 @@ for (const nome of arquivos) {
 if (atual.length) partes.push(atual);
 
 mkdirSync(DESTINO, { recursive: true });
-for (const velho of readdirSync(DESTINO)) if (/^1_estrutura_parte\d+\.sql$/.test(velho)) rmSync(join(DESTINO, velho));
+if (!desde) for (const velho of readdirSync(DESTINO)) if (/^1_estrutura_parte\d+\.sql$/.test(velho)) rmSync(join(DESTINO, velho));
 partes.forEach((parte, n) => {
   const corpo = parte.map((m) => `-- ======================================== ${m.nome}\n${m.sql.trim()}\n`).join("\n");
   const cabecalho = `-- Imobdesk · parte ${n + 1} de ${partes.length} (${parte[0].nome} … ${parte.at(-1).nome}).\n-- Cole no SQL Editor do ikvj e rode. Tudo numa transação.\n`;
-  writeFileSync(join(DESTINO, `1_estrutura_parte${n + 1}.sql`), `${cabecalho}begin;\n\n${corpo}\ncommit;\n`);
+  const nome = desde ? `atualizacao_${desde}${partes.length > 1 ? `_parte${n + 1}` : ""}.sql` : `1_estrutura_parte${n + 1}.sql`;
+  writeFileSync(join(DESTINO, nome), `${cabecalho}begin;\n\n${corpo}\ncommit;\n`);
 });
 console.log(`${arquivos.length} migrations em ${partes.length} parte(s) em ${DESTINO}.`);
