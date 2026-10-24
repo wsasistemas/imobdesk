@@ -100,14 +100,15 @@ describe("estrutura", () => {
     expect(semTenant.map((s) => `${s.t}.${s.conname}`)).toEqual([]);
   });
 
-  it("funções: só as de empresa, o hook do Auth e a que escreve no auth ficam com o postgres", async () => {
+  // security_sessao_valida lê auth.sessions, que tem RLS sem policy no Supabase: só o postgres (BYPASSRLS) enxerga.
+  it("funções: só as de empresa, o hook do Auth, a que escreve e a que lê sessões no auth ficam com o postgres", async () => {
     const doPostgres = await q(`select p.proname from pg_proc p where p.pronamespace = 'imobdesk'::regnamespace
                                   and pg_get_userbyid(p.proowner) <> 'imobdesk_dono' order by 1`);
     expect(doPostgres.map((f) => f.proname)).toEqual([
       "aplicar_multiempresa", "criar_empresa", "dominio_permitido", "eh_admin_wsa", "empresa_atual", "empresa_copiar_modelo",
       "empresa_de", "empresa_por_estado_oauth", "empresa_por_mensagem_zenvia", "empresa_por_numero", "empresa_por_sessao_openwa",
       "empresas_ativas", "encerrar_sessao", "listar_empresas_wsa", "minhas_empresas", "minhas_preferencias", "para_cada_empresa",
-      "salvar_tema", "security_password_verification_hook", "trocar_empresa",
+      "salvar_tema", "security_password_verification_hook", "security_sessao_valida", "trocar_empresa",
     ]);
     expect((await q(`select rolbypassrls b from pg_roles where rolname = 'imobdesk_dono'`))[0].b).toBe(false);
   });
