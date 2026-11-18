@@ -1,4 +1,4 @@
-/* Faixa de boas-vindas escura, com o quadro do ícone na cor da marca. */
+/* Faixa de boas-vindas no tom do menu (pêssego no claro, marinho no escuro), com o quadro do ícone na cor da marca. */
 .home-hero {
   display: flex;
   align-items: center;
@@ -6,7 +6,7 @@
   padding: 22px 24px;
   border-radius: 14px;
   background: var(--sidebar);
-  color: #ffffff;
+  color: var(--sidebar-strong);
   animation: home-hero-in 0.45s ease-out both;
 }
 

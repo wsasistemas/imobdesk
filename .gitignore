@@ -36,3 +36,7 @@ supabase/.temp/
 
 # Gerado pelo deno check local
 deno.lock
+
+# Artefatos de ferramentas locais (Playwright MCP, oh-my-claudecode)
+.playwright-mcp/
+.omc/

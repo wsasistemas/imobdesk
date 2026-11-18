@@ -468,9 +468,9 @@
 .sf-sug button[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-hover); }
 
 .sf-viewer { display: flex; flex-direction: column; min-height: 420px; overflow: hidden; border-radius: 12px; background: var(--viewer); }
-.sf-viewer__barra { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--sidebar); color: #d9dbe0; font-size: 12.5px; }
+.sf-viewer__barra { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--viewer-bar); color: #d9dbe0; font-size: 12.5px; }
 .sf-viewer__barra button, .sf-viewer__barra a { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 7px; background: transparent; color: #d9dbe0; cursor: pointer; }
-.sf-viewer__barra button:hover, .sf-viewer__barra a:hover { background: var(--sidebar-hover); }
+.sf-viewer__barra button:hover, .sf-viewer__barra a:hover { background: var(--viewer-bar-hover); }
 .sf-viewer__nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
 .sf-viewer__palco { flex: 1; display: grid; place-items: center; overflow: auto; padding: 16px; background: var(--viewer); }
 .sf-viewer__palco img { max-width: 100%; max-height: 520px; transition: transform 0.15s ease; }
@@ -504,11 +504,11 @@
 
 .sf-modal__fundo { position: fixed; inset: 0; z-index: 90; background: rgba(15, 16, 20, 0.72); }
 .sf-modal { position: fixed; inset: 0; z-index: 91; display: flex; flex-direction: column; }
-.sf-modal__barra { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--sidebar); color: #e4e6ea; }
+.sf-modal__barra { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--viewer-bar); color: #e4e6ea; }
 .sf-modal__t { flex: 1; margin: 0; font-size: 15px; }
-.sf-modal__barra button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border: 1px solid var(--sidebar-rail); border-radius: 8px; background: var(--sidebar-hover); color: #e4e6ea; font: inherit; font-weight: 600; cursor: pointer; }
+.sf-modal__barra button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border: 1px solid var(--viewer-bar-line); border-radius: 8px; background: var(--viewer-bar-hover); color: #e4e6ea; font: inherit; font-weight: 600; cursor: pointer; }
 .sf-modal__corpo { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 280px; min-height: 0; }
-.sf-modal__palco { display: flex; justify-content: center; overflow: auto; padding: 28px; background: var(--sidebar-rail); }
+.sf-modal__palco { display: flex; justify-content: center; overflow: auto; padding: 28px; background: var(--viewer); }
 .sf-modal__lado { overflow: auto; padding: 16px; background: var(--surface); }
 .sf-modal__lado h3 { margin: 0 0 10px; font-size: 15px; }
 .sf-a4 { flex: none; width: 794px; min-height: 1123px; padding: 46px 52px; background: #fff; color: #111; font-size: 11.5px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4); }

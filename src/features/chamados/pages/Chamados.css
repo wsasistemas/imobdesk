@@ -715,7 +715,7 @@
   padding: 7px 8px;
   border-radius: 9px 9px 0 0;
   background: var(--sidebar);
-  color: #ffffff;
+  color: var(--sidebar-strong);
 }
 
 .ch-kcol--pool .ch-kcol__head {
@@ -755,7 +755,7 @@
 }
 
 .ch-kcol__head button:hover:not(:disabled) {
-  background: color-mix(in srgb, #ffffff 15%, transparent);
+  background: var(--sidebar-hover);
 }
 
 .ch-kcol__head button:disabled {

@@ -9,9 +9,12 @@ import { isEffectivelyAllowed } from "../../access/policy";
 import { ServiceError, type AuditEntry, type PermissionRules, type User } from "../types";
 import { db, type RoleRecord, type UserRecord } from "./db";
 
-/** Latência simulada de 300 a 600 ms. */
+/**
+ * Latência simulada de 80 a 200 ms: o bastante para os estados de carregamento aparecerem, sem somar
+ * segundos quando várias chamadas encadeiam (sessão → usuário → permissões → menu).
+ */
 export function delay(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 300 + Math.random() * 300));
+  return new Promise((resolve) => setTimeout(resolve, 80 + Math.random() * 120));
 }
 
 export function newId(prefix: string): string {

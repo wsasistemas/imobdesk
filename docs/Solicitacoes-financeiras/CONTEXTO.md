@@ -74,6 +74,7 @@ Chips (fundo/texto): rascunho #EEF0F3/#3A3F4A; aguardando, em conferência, comp
 Tipografia: Inter (fallback system-ui). Título de página 28-32/700; título de card 17/700; corpo 14-15; rótulo 13/600; chip e legenda 12; eyebrow 12/700 em caixa alta, espaçamento 0,14em, cor brand.
 Forma: grade de 4 px; padding de card 20-22; gap 16-20; raio card 12, input/botão 8-10, chip 999; cards sem sombra, só borda; controles com no mínimo 44 px (botões finais 48, app 52).
 Componentes a criar em src/components/financeiro (ou no padrão do repo): AppShell (reusar o existente), PageHeader, KpiCard, DataTable, StatusChip, FormSection, Field, OcrField, ExpenseTable, AttachmentChip, Dropzone, ApprovalTimeline (verde concluído, borda laranja atual, tracejado não exigido, cinza futuro), ApproverChainPreview, DecisionBar (Reprovar contorno danger, Devolver contorno roxo, Aprovar preenchido success), ReceiptViewer (fundo #2A2C31, zoom, girar, tela cheia, PDF), RuleChecklist, FormPreview (A4 com toolbar escura).
+Barras escuras (2026-11-18): a barra do ReceiptViewer (`.sf-viewer__barra`) e a toolbar do FormPreview (`.sf-modal__barra`) usam o token `--viewer-bar` (`src/index.css`), escuro nos dois temas; o palco do FormPreview usa `--viewer`. Não use `--sidebar` para fundo escuro: no visual Apple HIG ele é pêssego claro no tema claro.
 Acessibilidade: contraste 4,5:1, botões e links reais, aria-label em botão só de ícone, responsivo (sidebar empilha no celular, tabelas com rolagem horizontal dentro do card).
 
 ========================================

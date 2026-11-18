@@ -15,7 +15,9 @@
         location.reload();
         return;
       }
-    } catch (e) {}
+    } catch {
+      // sessionStorage bloqueado (aba privada, dados do site barrados): segue para mostrar o motivo.
+    }
     shown = true;
     root.innerHTML =
       '<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:#f5f6f8;font-family:Inter,system-ui,sans-serif">' +

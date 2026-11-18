@@ -47,6 +47,10 @@
   --violet-bg: #f3e8ff;
   --violet-fg: #7e22ce;
   --viewer: #2a2b31;
+  /* Barra e balões escuros (visualizador, tooltip, código): continuam escuros nos dois temas. */
+  --viewer-bar: #34363d;
+  --viewer-bar-hover: rgb(255 255 255 / 0.1);
+  --viewer-bar-line: rgb(255 255 255 / 0.18);
   --online: #16a34a;
   --shadow-brand: 0 6px 18px -8px oklch(0.55 0.11 250 / 0.4);
 
@@ -110,6 +114,7 @@
   --violet-bg: oklch(0.3 0.06 300);
   --violet-fg: oklch(0.82 0.1 300);
   --viewer: oklch(0.14 0.02 255);
+  --viewer-bar: oklch(0.2 0.02 255);
   --online: oklch(0.72 0.17 150);
   color-scheme: dark;
 }
