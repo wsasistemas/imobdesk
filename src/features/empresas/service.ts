@@ -50,9 +50,10 @@ export interface EmpresasService {
 }
 
 // As RPCs novas ainda não estão nos tipos gerados (database.types.ts): chamada sem tipo, resultado conferido aqui.
+// Chamada como método (supabase.rpc(...)): tirar o rpc do objeto perde o `this` e quebra antes de enviar.
 type Resultado<T> = { data: T | null; error: PostgrestError | null };
-const rpc = <T>(nome: string, args: Record<string, unknown> = {}) =>
-  (supabase.rpc as unknown as (n: string, a: Record<string, unknown>) => PromiseLike<Resultado<T>>)(nome, args);
+type RpcSemTipo = { rpc: <T>(n: string, a: Record<string, unknown>) => PromiseLike<Resultado<T>> };
+const rpc = <T>(nome: string, args: Record<string, unknown> = {}) => (supabase as unknown as RpcSemTipo).rpc<T>(nome, args);
 
 async function chamar<T>(nome: string, args?: Record<string, unknown>): Promise<T> {
   const r = await rpc<T>(nome, args);

@@ -68,9 +68,10 @@ export const supabasePermissionsService: PermissionsService = {
     }
     // Menus do Super admin da WSA (Empresas): não basta ser Super admin da empresa aberta.
     if (menuRegistry.some((item) => item.wsaOnly)) {
-      // RPC nova, fora dos tipos gerados: chamada sem tipo.
-      const rpcSemTipo = supabase.rpc as unknown as (nome: string) => PromiseLike<{ data: { adminWsa?: boolean } | null; error: unknown }>;
-      const pref = await rpcSemTipo("minhas_preferencias");
+      // RPC nova, fora dos tipos gerados: chamada sem tipo, mas sempre como método (supabase.rpc(...)).
+      // Guardar supabase.rpc numa variável perde o `this`: a chamada quebrava antes de sair e derrubava o acesso.
+      type RpcSemTipo = { rpc: (nome: string) => PromiseLike<{ data: { adminWsa?: boolean } | null; error: unknown }> };
+      const pref = await (supabase as unknown as RpcSemTipo).rpc("minhas_preferencias");
       const adminWsa = !pref.error && pref.data?.adminWsa === true;
       for (const item of menuRegistry) if (item.wsaOnly) permissions[item.id] = adminWsa;
     }
